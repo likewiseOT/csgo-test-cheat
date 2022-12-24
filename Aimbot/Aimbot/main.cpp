@@ -147,7 +147,7 @@ namespace offset
 	constexpr ::std::ptrdiff_t dwZoomSensitivityRatioPtr = 0xDF4380;
 	constexpr ::std::ptrdiff_t dwbSendPackets = 0xDD072;
 	constexpr ::std::ptrdiff_t dwppDirect3DDevice9 = 0xA62C0;
-	constexpr ::std::ptrdiff_t find_hud_element = 0x2CF5FBD0;
+	constexpr ::std::ptrdiff_t find_hud_element = 0x2716FBD0;
 	constexpr ::std::ptrdiff_t force_update_spectator_glow = 0x3D91CA;
 	constexpr ::std::ptrdiff_t interface_engine_cvar = 0x3FA9C;
 	constexpr ::std::ptrdiff_t is_c4_owner = 0x3E69E0;
@@ -184,13 +184,33 @@ int main()
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-		// aimbot key
-		if (!GetAsyncKeyState(VK_RBUTTON))
-			continue;
-
 		// get local player
 		const auto localPlayer = memory.Read<std::uintptr_t>(client + offset::dwLocalPlayer);
 		const auto localTeam = memory.Read<std::int32_t>(localPlayer + offset::m_iTeamNum);
+
+		// get glowObjectManager
+		const auto glowObjectManager = memory.Read<std::uintptr_t>(client + offset::dwGlowObjectManager);
+
+		for (auto i = 0; i < 64; ++i) {
+			const auto entity = memory.Read<std::uintptr_t>(client + offset::dwEntityList + i * 0x10);
+
+			if (memory.Read<std::uintptr_t>(entity + offset::m_iTeamNum) == memory.Read<std::uintptr_t>(localPlayer + offset::m_iTeamNum))
+				continue;
+
+			const auto glowIndex = memory.Read<std::int32_t>(entity + offset::m_iGlowIndex);
+
+			memory.Write<float>(glowObjectManager + (glowIndex + 0x38) + 0x8, 1.f); // r
+			memory.Write<float>(glowObjectManager + (glowIndex + 0x38) + 0xC, 0.f); // g
+			memory.Write<float>(glowObjectManager + (glowIndex + 0x38) + 0x10, 0.f); // b
+			memory.Write<float>(glowObjectManager + (glowIndex + 0x38) + 0x14, 1.f); // a
+
+			memory.Write<bool>(glowObjectManager + (glowIndex * 0x38) + 0x27, true);
+			memory.Write<bool>(glowObjectManager + (glowIndex * 0x38) + 0x28, true);
+		}
+
+		// aimbot key
+		if (!GetAsyncKeyState(VK_RBUTTON))
+			continue;
 
 		// eye position = origin + viewOffset
 		const auto localEyePosition = memory.Read<Vector3>(localPlayer + offset::m_vecOrigin) +
@@ -205,7 +225,7 @@ int main()
 		const auto aimPunch = memory.Read<Vector3>(localPlayer + offset::m_aimPunchAngle) * 2;
 
 		// aimbot fov
-		auto bestFov = 5.f;
+		auto bestFov = 50.f;
 		auto bestAngle = Vector3{ };
 
 		for (auto i = 1; i <= 32; ++i)
